@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Catering Orders</title>
+<style>
+  body{font-family:system-ui,Arial,sans-serif;margin:0;background:#f7f7f7}
+  .wrap{max-width:520px;margin:0 auto;padding:20px}
+  h1{text-align:center;font-size:1.3rem;margin:10px 0 16px}
+  .card{background:#fff;border-radius:16px;padding:16px;box-shadow:0 4px 20px rgba(0,0,0,.06)}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .btn{flex:1;min-width:140px;text-align:center;padding:14px;border-radius:12px;border:2px solid #ddd;background:#fff;font-size:1.05rem;cursor:pointer}
+  .btn.active{border-color:#111;background:#eee;font-weight:700}
+  .field{margin-top:12px}
+  .field label{display:block;font-weight:700;margin-bottom:6px}
+  input[type="date"],input[type="text"],input[type="tel"],textarea{
+    width:100%;padding:14px;font-size:1rem;border:2px solid #ddd;border-radius:10px;box-sizing:border-box;background:#fff}
+  .item-row{display:flex;gap:8px;margin-top:8px}
+  .item-row input[type="text"]{flex:1}
+  .qty{display:flex;align-items:center;gap:8px}
+  .qty button{width:40px;height:40px;border-radius:10px;border:2px solid #ccc;background:#fff;font-size:1.2rem;cursor:pointer}
+  .pill{padding:8px 12px;border:1px solid #ddd;border-radius:999px;background:#fff;cursor:pointer}
+  .pill:hover{background:#f2f2f2}
+  .submit{margin-top:16px;width:100%;padding:16px;font-size:1.2rem;border:none;border-radius:12px;background:#111;color:#fff;font-weight:700;cursor:pointer}
+  .ok{background:#e8fff1;border:1px solid #b2f0cd;color:#094b2f;padding:12px;border-radius:10px;margin-top:12px;display:none}
+  .err{background:#ffecec;border:1px solid #ffc9c9;color:#7a0000;padding:12px;border-radius:10px;margin-top:12px;display:none}
+  .muted{color:#666;font-size:.9rem;margin-top:6px}
+</style>
+<body>
+<div class="wrap">
+  <h1>Daily Catering Order</h1>
+  <div class="card">
+    <div class="field">
+      <label>Venue</label>
+      <div class="row" id="venueRow">
+        <button class="btn" data-venue="Sugar Land">Sugar Land</button>
+        <button class="btn" data-venue="The Woodlands">The Woodlands</button>
+      </div>
+      <div class="muted">Tap one.</div>
+    </div>
+
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="dateInput"/>
+    </div>
+
+    <div class="field">
+      <label>Thali Size</label>
+      <div class="row" id="thaliRow">
+        <button class="btn" data-size="">None</button>
+        <button class="btn" data-size="Small">Small</button>
+        <button class="btn" data-size="Medium">Medium</button>
+        <button class="btn" data-size="Large">Large</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Items</label>
+      <div id="items"></div>
+      <button class="btn" id="addItemBtn" style="margin-top:8px">+ Add another item</button>
+      <div class="muted">Free text. Use suggestions below to avoid typing.</div>
+      <div id="suggestions" class="row" style="margin-top:8px"></div>
+    </div>
+
+    <div class="field">
+      <label>Notes (optional)</label>
+      <textarea id="notes" placeholder="Allergy, time window, etc."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Your Name (optional)</label>
+      <input type="text" id="name" placeholder="e.g., Kitchen Lead"/>
+    </div>
+
+    <div class="field">
+      <label>Phone (optional)</label>
+      <input type="tel" id="phone" placeholder="e.g., 555-123-4567"/>
+    </div>
+
+    <button class="submit" id="submitBtn">Submit Order</button>
+    <div class="ok" id="ok">✅ Order recorded.</div>
+    <div class="err" id="err">❌ Could not submit. Please try again.</div>
+  </div>
+</div>
+
+<script>
+const ENDPOINT = 'https://script.google.com/macros/s/AKfycbzc3Z0Sm5BSQ1wg0OMIffXngxsG3VifSv-WC0VHXzRcKmTYY8ZDU6TVBNRmGQ5Zp_firw/exec';  // <-- replace with your Apps Script Web App URL
+
+// date default = today
+const dateInput = document.getElementById('dateInput');
+dateInput.valueAsDate = new Date();
+
+// venue picker
+let venue = '';
+const venueRow = document.getElementById('venueRow');
+venueRow.addEventListener('click', e=>{
+  const b = e.target.closest('.btn'); if(!b) return;
+  [...venueRow.querySelectorAll('.btn')].forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); venue = b.dataset.venue;
+});
+
+// thali size picker
+let thaliSize = '';
+const thaliRow = document.getElementById('thaliRow');
+thaliRow.addEventListener('click', e=>{
+  const b = e.target.closest('.btn'); if(!b) return;
+  [...thaliRow.querySelectorAll('.btn')].forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); thaliSize = b.dataset.size || '';
+});
+
+// items (free text + qty)
+const itemsDiv = document.getElementById('items');
+function newItemRow(name=''){
+  const row = document.createElement('div');
+  row.className='item-row';
+  row.innerHTML = `
+    <input type="text" class="item-name" placeholder="e.g., Chicken Biryani" value="${name}">
+    <div class="qty">
+      <button type="button" class="dec">−</button>
+      <input type="text" class="item-qty" value="1" style="width:42px;text-align:center;border:2px solid #ddd;border-radius:8px;height:40px">
+      <button type="button" class="inc">+</button>
+    </div>
+  `;
+  row.addEventListener('click', e=>{
+    if(e.target.classList.contains('inc')){
+      const q = row.querySelector('.item-qty'); q.value = Math.max(1, (+q.value||1)+1);
+    }
+    if(e.target.classList.contains('dec')){
+      const q = row.querySelector('.item-qty'); q.value = Math.max(1, (+q.value||1)-1);
+    }
+  });
+  itemsDiv.appendChild(row);
+}
+newItemRow(); // first line
+document.getElementById('addItemBtn').addEventListener('click', ()=>newItemRow());
+
+// suggestions from localStorage (last 20)
+const SKEY = 'recent_items_v1';
+function getRecents(){ try{ return JSON.parse(localStorage.getItem(SKEY)||'[]'); }catch{return []} }
+function saveRecents(names){
+  const set = new Set([...getRecents(), ...names.filter(Boolean).map(n=>n.trim())]);
+  const arr = Array.from(set).slice(-20);
+  localStorage.setItem(SKEY, JSON.stringify(arr));
+}
+function renderSuggestions(){
+  const s = document.getElementById('suggestions'); s.innerHTML='';
+  getRecents().slice().reverse().forEach(n=>{
+    const pill = document.createElement('button'); pill.className='pill'; pill.textContent=n;
+    pill.addEventListener('click', ()=>newItemRow(n));
+    s.appendChild(pill);
+  });
+}
+renderSuggestions();
+
+function collectItems(){
+  const rows = [...document.querySelectorAll('.item-row')];
+  const list = [];
+  rows.forEach(r=>{
+    const name = r.querySelector('.item-name').value.trim();
+    const qty  = Math.max(1, parseInt(r.querySelector('.item-qty').value||'1',10));
+    if(name) list.push({ name, qty });
+  });
+  return list;
+}
+
+const okEl = document.getElementById('ok'), errEl = document.getElementById('err');
+const submitBtn = document.getElementById('submitBtn');
+
+async function submit(){
+  okEl.style.display='none'; errEl.style.display='none';
+  if(!venue){ alert('Please select a venue.'); return; }
+  const items = collectItems();
+  if(items.length===0){ alert('Please add at least one item.'); return; }
+
+  // store suggestions
+  saveRecents(items.map(i=>i.name)); renderSuggestions();
+
+  submitBtn.disabled = true; submitBtn.textContent='Submitting…';
+  const payload = {
+    date: dateInput.value,
+    venue,
+    items,
+    notes: document.getElementById('notes').value.trim(),
+    name: document.getElementById('name').value.trim(),
+    phone: document.getElementById('phone').value.trim(),
+    thaliSize
+  };
+  try{
+    const res = await fetch(ENDPOINT, {
+      method:'POST',
+      headers:{ 'Content-Type':'text/plain' },   // <--- IMPORTANT CHANGE
+      body: JSON.stringify(payload)              // sent as plain text JSON
+    });
+    const json = await res.json();
+    if(json.ok){
+      okEl.style.display='block';
+      itemsDiv.innerHTML=''; newItemRow();
+      document.getElementById('notes').value='';
+      document.getElementById('name').value='';
+      document.getElementById('phone').value='';
+    }else{ throw new Error(json.error||'Failed'); }
+  }catch(e){
+    errEl.textContent='❌ Could not submit. Please try again.'; errEl.style.display='block';
+  }finally{
+    submitBtn.disabled=false; submitBtn.textContent='Submit Order';
+  }
+}
+submitBtn.addEventListener('click', submit);
+</script>
+</body>
+</html>
