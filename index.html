@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
+<head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Catering Orders</title>
+<link rel="icon" href="data:,">
 <style>
   body{font-family:system-ui,Arial,sans-serif;margin:0;background:#f7f7f7}
   .wrap{max-width:520px;margin:0 auto;padding:20px}
@@ -26,6 +28,7 @@
   .err{background:#ffecec;border:1px solid #ffc9c9;color:#7a0000;padding:12px;border-radius:10px;margin-top:12px;display:none}
   .muted{color:#666;font-size:.9rem;margin-top:6px}
 </style>
+</head>
 <body>
 <div class="wrap">
   <h1>Daily Catering Order</h1>
@@ -84,7 +87,8 @@
 </div>
 
 <script>
-const ENDPOINT = 'https://script.google.com/macros/s/AKfycbzc3Z0Sm5BSQ1wg0OMIffXngxsG3VifSv-WC0VHXzRcKmTYY8ZDU6TVBNRmGQ5Zp_firw/exec';  // <-- replace with your Apps Script Web App URL
+// We call the same-origin proxy at /api/catering (no CORS).
+const ENDPOINT = '/api/catering';
 
 // date default = today
 const dateInput = document.getElementById('dateInput');
@@ -188,8 +192,8 @@ async function submit(){
   try{
     const res = await fetch(ENDPOINT, {
       method:'POST',
-      headers:{ 'Content-Type':'text/plain' },   // <--- IMPORTANT CHANGE
-      body: JSON.stringify(payload)              // sent as plain text JSON
+      headers:{ 'Content-Type':'application/json' }, // same-origin
+      body: JSON.stringify(payload)
     });
     const json = await res.json();
     if(json.ok){
